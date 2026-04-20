@@ -4,7 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js"
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "dev:http": "nodemon --exec tsx src/server/server.ts",
+  "dev:tcp": "nodemon --exec tsx src/server/tcpServer.ts"
   },
   "keywords": [],
   "author": "",

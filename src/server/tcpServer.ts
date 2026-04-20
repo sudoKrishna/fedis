@@ -1,5 +1,6 @@
 import net from "net";
 
+
 // ===== Types
 type CacheEntry = {
   value: string;
@@ -225,6 +226,6 @@ const server = net.createServer((socket) => {
   });
 });
 
-server.listen(6380, () => {
+server.listen(6380, "0.0.0.0", () => {
   console.log("fedis  running on port 6380");
 });

@@ -1,23 +1,49 @@
-export class CacheStore<K, V> {
-    private store: Map<K, V>;
+type CacheEntry<T> = {
+    value : T;
+    expiry?: number;
+}
 
-    constructor() {
-        this.store = new Map<K, V>();
+export class CacheStore<T = any> {
+    private store = new Map<string, CacheEntry<T>>();
+
+    set(key: string, value: T, ttlMs?: number): void {
+        const entry : CacheEntry<T> = ttlMs ? {
+            value,
+            expiry : Date.now() + ttlMs,
+        } : {
+            value,
+        }
+        this.store.set(key , entry);
     }
 
-    set(key: K, value: V): void {
-        this.store.set(key, value)
+    get(key : string) : T | undefined {
+       const entry = this.store.get(key);
+
+       if(!entry) return undefined;
+
+       if(entry.expiry && Date.now() > entry.expiry) {
+        this.store.delete(key);
+        return undefined;
+       }
+       return entry.value;
     }
 
-    get(key: K): V | undefined {
-        return this.store.get(key);
-    }
-
-    delete(key: K): boolean {
+  
+    delete(key: string): boolean {
         return this.store.delete(key);
     }
-    has(key: K): boolean {
-        return this.store.has(key);
+
+
+    has(key: string): boolean {
+       const entry  =  this.store.get(key);
+
+       if(!entry) return false;
+
+       if(entry.expiry && Date.now() > entry.expiry) {
+        this.store.delete(key);
+        return false;
+       }
+       return true;
     }
 
     clear(): void {

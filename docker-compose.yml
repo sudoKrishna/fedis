@@ -1,0 +1,49 @@
+version: "3.8"
+
+services:
+  sync-hub:
+    build:
+      context: .
+      dockerfile: Dockerfile.sync
+    ports:
+      - "4000:4000"
+    restart: always
+
+  cache-a:
+    build:
+      context: .
+      dockerfile: Dockerfile.cache
+    environment:
+      - INSTANCE_ID=A
+      - PORT=3000
+    ports:
+      - "3001:3000"
+    depends_on:
+      - sync-hub
+    restart: always
+
+  cache-b:
+    build:
+      context: .
+      dockerfile: Dockerfile.cache
+    environment:
+      - INSTANCE_ID=B
+      - PORT=3000
+    ports:
+      - "3002:3000"
+    depends_on:
+      - sync-hub
+    restart: always
+
+  cache-c:
+    build:
+      context: .
+      dockerfile: Dockerfile.cache
+    environment:
+      - INSTANCE_ID=C
+      - PORT=3000
+    ports:
+      - "3003:3000"
+    depends_on:
+      - sync-hub
+    restart: always

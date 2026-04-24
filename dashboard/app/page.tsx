@@ -75,7 +75,7 @@ export default async function DashboardPage() {
           </p>
 
           <p className="mt-3 text-sm text-gray-500">
-            Backend URL: http://localhost:3001/monitor
+            Backend URL: http://localhost:3001/monitor for now .
           </p>
         </div>
       </div>

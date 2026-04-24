@@ -1,7 +1,7 @@
 import type { EvictionPolicy } from "../eviction/EvictionPolicy";
 import { SyncBus } from "../sync/SyncBus";
 
-export type CacheEntry<T> = {
+export type CacheEntry<T = any> = {
   value: T;
   expiry?: number;
   timestamp: number; 
@@ -19,6 +19,9 @@ type SyncEvent<T> = {
 export class CacheStore<T = any> {
   private store = new Map<string, CacheEntry<T>>();
   private instanceId = process.env.INSTANCE_ID || Math.random().toString();
+  private hits = 0;
+private misses = 0;
+private evictionCount = 0;
 
   constructor(
     private capacity: number,
@@ -69,51 +72,57 @@ export class CacheStore<T = any> {
   }
 
   set(key: string, value: T, ttlMs?: number): void {
-    if (this.store.size >= this.capacity && !this.store.has(key)) {
-      const evictKey = this.policy.evict();
+  if (this.store.size >= this.capacity && !this.store.has(key)) {
+    const evictKey = this.policy.evict();
 
-      if (evictKey !== null) {
-        this.delete(evictKey);
-      }
+    if (evictKey !== null) {
+      this.evictionCount++;
+      this.delete(evictKey);
     }
-
-    const timestamp = Date.now();
-
-    const expiryPart =
-      ttlMs !== undefined ? { expiry: timestamp + ttlMs } : {};
-
-
-    const entry: CacheEntry<T> = {
-      value,
-      timestamp,
-      ...expiryPart
-    };
-
-    this.store.set(key, entry);
-    this.policy.onSet(key);
-
-    this.syncBus?.publish({
-      type: "set",
-      key,
-      value,
-      ...(entry.expiry !== undefined && { expiry: entry.expiry }),
-      timestamp,
-      source: this.instanceId
-    });
   }
 
-  get(key: string): T | undefined {
-    const entry = this.store.get(key);
-    if (!entry) return undefined;
+  const timestamp = Date.now();
 
-    if (entry.expiry && Date.now() > entry.expiry) {
-      this.delete(key);
-      return undefined;
-    }
+  const expiryPart =
+    ttlMs !== undefined ? { expiry: timestamp + ttlMs } : {};
 
-    this.policy.onGet(key);
-    return entry.value;
+  const entry: CacheEntry<T> = {
+    value,
+    timestamp,
+    ...expiryPart
+  };
+
+  this.store.set(key, entry);
+  this.policy.onSet(key);
+
+  this.syncBus?.publish({
+    type: "set",
+    key,
+    value,
+    ...(entry.expiry !== undefined && { expiry: entry.expiry }),
+    timestamp,
+    source: this.instanceId
+  });
+}
+
+ get(key: string): T | undefined {
+  const entry = this.store.get(key);
+
+  if (!entry) {
+    this.misses++;
+    return undefined;
   }
+
+  if (entry.expiry && Date.now() > entry.expiry) {
+    this.delete(key);
+    this.misses++;
+    return undefined;
+  }
+
+  this.hits++;
+  this.policy.onGet(key);
+  return entry.value;
+}
 
   delete(key: string, broadcast = true): boolean {
     const existed = this.store.delete(key);
@@ -133,6 +142,15 @@ export class CacheStore<T = any> {
 
     return existed;
   }
+
+  getStats() {
+  return {
+    totalKeys: this.store.size,
+    hits: this.hits,
+    misses: this.misses,
+    evictionCount: this.evictionCount
+  };
+}
 
   has(key: string): boolean {
     const entry = this.store.get(key);
@@ -157,7 +175,7 @@ export class CacheStore<T = any> {
   }
 
   getAll(): Map<string, CacheEntry<T>> {
-    return this.store;
+    return new Map(this.store);
   }
 
   loadFrom(entries: Map<string, CacheEntry<T>>) {

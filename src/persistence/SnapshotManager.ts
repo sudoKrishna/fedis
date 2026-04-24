@@ -1,51 +1,57 @@
 import fs from "fs/promises";
-
-type CacheEntry = {
-    value : any;
-    expiresAt: number | null;
-};
+import path from "path";
+import type { CacheEntry } from "../store/CacheStore";
 
 export class SnapshotManager {
   constructor(private filePath: string) {}
 
-  async save(store: Map<string, CacheEntry>) {
-    try {
-      await fs.mkdir("data", { recursive: true });
 
-      const data = JSON.stringify([...store.entries()]);
-      await fs.writeFile(this.filePath, data, "utf-8");
+async save(store: Map<string, CacheEntry<any>>) {
+  try {
+    
+    await fs.mkdir(path.dirname(this.filePath), { recursive: true });
 
-      console.log("snapshot saved");
-    } catch (err) {
-      console.error("Error saving snapshot:", err);
+    const obj: Record<string, CacheEntry<any>> = {};
+
+    for (const [key, value] of store.entries()) {
+      obj[key] = value;
     }
+
+    await fs.writeFile(this.filePath, JSON.stringify(obj), "utf-8");
+
+    console.log("Snapshot saved");
+  } catch (err) {
+    console.error("Error saving snapshot:", err);
   }
+}
 
-  async load(): Promise<Map<string, CacheEntry>> {
-    try {
-      const data = await fs.readFile(this.filePath, "utf-8");
-      const parsed: [string, CacheEntry][] = JSON.parse(data);
 
-      const map = new Map(parsed);
-      const now = Date.now();
+  async load(): Promise<Map<string, CacheEntry<any>>> {
+  try {
+    const data = await fs.readFile(this.filePath, "utf-8");
+    const parsed = JSON.parse(data);
 
-      for (const [key, entry] of map) {
-        if (entry.expiresAt && entry.expiresAt < now) {
-          map.delete(key);
-        }
-      }
+    const map = new Map<string, CacheEntry<any>>();
+    const now = Date.now();
 
-      console.log("Snapshot loaded");
-      return map;
+    for (const key of Object.keys(parsed)) {
+      const entry = parsed[key];
 
-    } catch (err: any) {
-      if (err.code === "ENOENT") {
-        console.log("No snapshot found, starting fresh");
-        return new Map();
-      }
+      if (entry.expiry && entry.expiry < now) continue;
 
-      console.error("Error loading snapshot:", err);
+      map.set(key, {
+        value: entry.value,
+        expiry: entry.expiry,
+        timestamp: entry.timestamp ?? now 
+      });
+    }
+
+    return map;
+  } catch (err: any) {
+    if (err.code === "ENOENT") {
       return new Map();
     }
+    return new Map();
   }
+}
 }
